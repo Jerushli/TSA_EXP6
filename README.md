@@ -21,98 +21,73 @@ Winters model to the entire dataset and make future predictions
 ### PROGRAM:
 
 ```
-import pandas as pd
 import matplotlib.pyplot as plt
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-```
-```
-data = pd.read_csv('/content/INDIA VIX_minute.csv', parse_dates=['date'],index_col='date')
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+import pandas as pd
 
-data.head()
-```
-```
-# Ensure index is datetime
-data.index = pd.to_datetime(data.index, errors='coerce')
+# Load the dataset
+file_path = "NFLX.csv"  # Update with your actual path if needed
+data = pd.read_csv(file_path, parse_dates=["Date"], index_col="Date")
 
-# Drop rows where datetime parsing failed (if any)
-data = data.dropna()
+# Use only the Close (Netflix stock price) column
+data['Close'] = pd.to_numeric(data['Close'], errors='coerce')
+data = data.dropna(subset=['Close'])
 
-# Now resample monthly (month start)
-data_monthly = data.resample('MS').sum()
+# Resample the data to monthly frequency (mean of each month)
+monthly_data = data['Close'].resample('MS').mean()
 
-print(data_monthly.head())
-data_monthly.plot()
-plt.show()
+# Split the data into train and test sets (90% train, 10% test)
+train_data = monthly_data[:int(0.9 * len(monthly_data))]
+test_data = monthly_data[int(0.9 * len(monthly_data)):]
 
-```
-```
-scaler = MinMaxScaler()
-scaled_data = pd.Series(
-    scaler.fit_transform(data_monthly['close'].values.reshape(-1, 1)).flatten(),
-    index=data_monthly.index
-)
-
-scaled_data.plot()
-plt.show()
-
-```
-```
-import numpy as np
-from sklearn.metrics import mean_squared_error
-
-# Shifted scaled_data by +1 already
-train_data = scaled_data[:int(len(scaled_data) * 0.8)]
-test_data = scaled_data[int(len(scaled_data) * 0.8):]
-
-model_add = ExponentialSmoothing(train_data, trend='add', seasonal='mul').fit()
-
-# Forecast with aligned index
-test_predictions_add = pd.Series(
-    model_add.forecast(steps=len(test_data)),
-    index=test_data.index
-)
-
-# Plot
-ax = train_data.plot()
-test_predictions_add.plot(ax=ax)
-test_data.plot(ax=ax)
-ax.legend(["train_data", "test_predictions_add","test_data"])
-ax.set_title('Visual evaluation')
-
-# RMSE
-print("RMSE:", np.sqrt(mean_squared_error(test_data, test_predictions_add)))
-
-# Variance and mean
-print("Scaled variance sqrt, mean:", np.sqrt(scaled_data.var()), scaled_data.mean())
-```
-```
-final_model = ExponentialSmoothing(
-    data_monthly['close'],  # pick one column
+# Holt-Winters model with additive trend and seasonality
+fitted_model = ExponentialSmoothing(
+    train_data,
     trend='add',
-    seasonal='mul',
+    seasonal='add',
+    seasonal_periods=12  # yearly seasonality for monthly data
+).fit()
+
+# Forecast on the test set
+test_predictions = fitted_model.forecast(len(test_data))
+
+# Plot the results
+plt.figure(figsize=(12, 8))
+train_data.plot(legend=True, label='Train')
+test_data.plot(legend=True, label='Test')
+test_predictions.plot(legend=True, label='Predicted')
+plt.title('Train, Test, and Predicted Netflix Prices (Holt-Winters)')
+plt.show()
+
+# Evaluate model performance
+mae = mean_absolute_error(test_data, test_predictions)
+mse = mean_squared_error(test_data, test_predictions)
+print(f"Mean Absolute Error = {mae:.4f}")
+print(f"Mean Squared Error = {mse:.4f}")
+
+# Fit the model to the entire dataset and forecast the future
+final_model = ExponentialSmoothing(
+    monthly_data,
+    trend='add',
+    seasonal='add',
     seasonal_periods=12
 ).fit()
 
-# Forecast for next year
-final_predictions = final_model.forecast(steps=12)
+forecast_predictions = final_model.forecast(steps=12)  # Forecast 12 future months
 
-# Plot
-ax = data_monthly['close'].plot(label="data_monthly")
-final_predictions.plot(ax=ax, label="final_predictions")
-ax.legend()
-ax.set_xlabel('Date')
-ax.set_ylabel('Close Price')
-ax.set_title('Prediction')
+# Plot the original and forecasted data
+plt.figure(figsize=(12, 8))
+monthly_data.plot(legend=True, label='Original Data')
+forecast_predictions.plot(legend=True, label='Forecasted Data', color='red')
+plt.title('Original and Forecasted Netflix Stock Prices (Holt-Winters Additive)')
+plt.show()
 ```
 ### OUTPUT:
 
-<img width="863" height="723" alt="image" src="https://github.com/user-attachments/assets/5bddf814-4b72-4d72-8897-174fb0d3578a" />
-<img width="723" height="448" alt="image" src="https://github.com/user-attachments/assets/5f4522be-fdbf-4176-b44c-2ac0ca14f2b0" />
+<img width="986" height="700" alt="image" src="https://github.com/user-attachments/assets/9dfb457b-53b0-4c5e-b531-d348f08f4923" />
+<img width="988" height="735" alt="image" src="https://github.com/user-attachments/assets/4d6dbefe-2c53-425c-8936-35ef19a56435" />
 
-<img width="702" height="508" alt="image" src="https://github.com/user-attachments/assets/8e34bd00-81e8-42b6-b369-cee273c91fe5" />
-<img width="734" height="494" alt="image" src="https://github.com/user-attachments/assets/e419d4cd-128c-42c3-b067-9ce0a1c105ae" />
 
 ### RESULT:
 Thus the program run successfully based on the Holt Winters Method model.
